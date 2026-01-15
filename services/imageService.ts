@@ -1,6 +1,5 @@
 
-// This service now calls our internal /api/generate endpoint.
-// This ensures the API Key is hidden and solves CORS/Region issues (works in HK).
+// This service calls our internal /api/generate endpoint.
 
 export const generateThemeBackground = async (prompt: string): Promise<string | null> => {
   try {
@@ -12,14 +11,18 @@ export const generateThemeBackground = async (prompt: string): Promise<string | 
       body: JSON.stringify({ prompt }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`);
+      console.error("Server returned error:", data.error);
+      // You can uncomment this to see the alert in browser for debugging
+      // alert(`Error: ${data.error}`); 
+      return null;
     }
 
-    const data = await response.json();
     return data.image || null;
   } catch (error) {
-    console.error("Image generation failed:", error);
+    console.error("Image generation connection failed:", error);
     return null;
   }
 };

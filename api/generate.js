@@ -1,32 +1,26 @@
 import { GoogleGenAI } from '@google/genai';
 
-export const config = {
-  runtime: 'edge',
-};
-
-export default async function handler(request) {
+// Switch to Node.js runtime (remove 'edge' config) for better stability with the SDK
+export default async function handler(request, response) {
+  // Handle CORS if needed, though usually same-origin in Vercel
   if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return response.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
-    const { prompt } = await request.json();
+    const { prompt } = request.body; 
 
     if (!process.env.API_KEY) {
-      return new Response(JSON.stringify({ error: 'Server API Key not configured' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      console.error("Server Error: API_KEY is missing in environment variables.");
+      return response.status(500).json({ error: 'Server configuration error: API Key missing.' });
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // FIXED: Must use 'gemini-2.5-flash-image' for image generation.
-    // 'gemini-2.5-flash' only returns text.
-    const response = await ai.models.generateContent({
+    console.log("Attempting to generate image with prompt:", prompt);
+
+    // Using gemini-2.5-flash-image
+    const result = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: [{ text: prompt + ". Photorealistic, high quality, vivid colors, 16:9 aspect ratio." }],
@@ -40,7 +34,7 @@ export default async function handler(request) {
 
     // Extract the base64 image data
     let imageBase64 = null;
-    const parts = response.candidates?.[0]?.content?.parts;
+    const parts = result.candidates?.[0]?.content?.parts;
     
     if (parts) {
       for (const part of parts) {
@@ -52,22 +46,16 @@ export default async function handler(request) {
     }
 
     if (!imageBase64) {
-      // Log the text response if debugging is needed
-      const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+      const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
       console.warn("Model returned text instead of image:", text);
-      throw new Error('Model did not return an image.');
+      return response.status(500).json({ error: 'Generation failed: Model returned text instead of image.' });
     }
 
-    return new Response(JSON.stringify({ image: imageBase64 }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return response.status(200).json({ image: imageBase64 });
 
   } catch (error) {
-    console.error("API Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    console.error("API Error Detailed:", error);
+    const errorMessage = error.message || "Unknown server error";
+    return response.status(500).json({ error: errorMessage });
   }
 }
