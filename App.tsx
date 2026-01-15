@@ -28,38 +28,56 @@ const App: React.FC = () => {
     }
   }, [gameState]);
 
+  // Wrapper for generation with error handling
+  const handleGeneration = async (genFunction: () => Promise<string | null>, successCallback: (url: string) => void) => {
+    setIsGenerating(true);
+    try {
+        const result = await genFunction();
+        if (result) {
+            successCallback(result);
+        } else {
+            alert("生成失敗，可能是網路問題或模型繁忙，請再試一次。");
+        }
+    } catch (e: any) {
+        console.error(e);
+        if (e.message && e.message.includes("API Key")) {
+            alert(e.message);
+        } else {
+            alert("發生錯誤：" + (e.message || "未知原因"));
+        }
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
   // Generate specific theme (used for Therapist mode OR continuing a category)
   const generateNewBackground = async (prompt: string) => {
-    setIsGenerating(true);
-    const result = await generateThemeBackground(prompt);
-    if (result) {
-      setCustomBgUrl(result);
-      setProgress(0);
-      setGameState(GameState.PLAYING);
-    } else {
-      alert("抱歉，連線不穩或生成失敗，請再試一次！");
-    }
-    setIsGenerating(false);
+    await handleGeneration(
+        () => generateThemeBackground(prompt),
+        (url) => {
+            setCustomBgUrl(url);
+            setProgress(0);
+            setGameState(GameState.PLAYING);
+        }
+    );
   };
 
   const handleRandomPlay = async () => {
-      setIsGenerating(true);
-      const result = await generateRandomBackground();
-      if (result) {
-          setCurrentBg({
-              id: 'random',
-              url: result,
-              label: '神秘世界',
-              emoji: '🎲',
-              prompt: 'Random generation'
-          });
-          setCustomBgUrl(result);
-          setProgress(0);
-          setGameState(GameState.PLAYING);
-      } else {
-        alert("抱歉，連線不穩或生成失敗，請再試一次！");
-      }
-      setIsGenerating(false);
+      await handleGeneration(
+          () => generateRandomBackground(),
+          (url) => {
+            setCurrentBg({
+                id: 'random',
+                url: url,
+                label: '神秘世界',
+                emoji: '🎲',
+                prompt: 'Random generation'
+            });
+            setCustomBgUrl(url);
+            setProgress(0);
+            setGameState(GameState.PLAYING);
+          }
+      );
   };
 
   const handleNextLevel = () => {
