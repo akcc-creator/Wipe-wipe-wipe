@@ -15,6 +15,9 @@ const App: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [wipesRequired, setWipesRequired] = useState(4); 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  
+  // Track specific error type for UI actions
+  const [isQuotaError, setIsQuotaError] = useState(false);
 
   // Check if API Key is detected (for UI indication only)
   const hasApiKey = !!process.env.API_KEY;
@@ -40,6 +43,7 @@ const App: React.FC = () => {
   ) => {
     setIsGenerating(true);
     setErrorMsg(null);
+    setIsQuotaError(false);
     try {
         const result = await genFunction();
         if (result) {
@@ -56,8 +60,9 @@ const App: React.FC = () => {
 
         if (rawMsg.includes("API Key")) {
             friendlyMsg = "找不到 API Key。\n請確認 .env 檔案已設定 API_KEY。";
-        } else if (rawMsg.includes("429") || rawMsg.includes("Quota")) {
-            friendlyMsg = "AI 畫師目前太忙碌 (額度不足)。\n請稍後再試。";
+        } else if (rawMsg.includes("429") || rawMsg.includes("Quota") || rawMsg.includes("Too Many Requests")) {
+            friendlyMsg = "AI 畫師目前太忙碌 (免費額度用完)。\n建議您先玩「經典景點」模式！";
+            setIsQuotaError(true);
         } else if (rawMsg.includes("Server endpoint")) {
             friendlyMsg = "伺服器連線錯誤。\n若是本機執行，請確認 .env 有設定 API_KEY。";
         } else if (rawMsg.includes("Candidate was blocked")) {
@@ -109,6 +114,13 @@ const App: React.FC = () => {
     }
   };
 
+  const switchToPresetMode = () => {
+      setErrorMsg(null);
+      // Pick a random preset
+      const randomPreset = BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)];
+      startLevel(randomPreset);
+  };
+
   return (
     <div className="relative w-screen h-screen flex flex-col bg-[#f8fafc]">
       {/* Error Modal */}
@@ -116,7 +128,7 @@ const App: React.FC = () => {
         <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center border-4 border-red-100 animate-[bounceIn_0.5s_cubic-bezier(0.175,0.885,0.32,1.275)]">
                 <div className="text-6xl mb-4">😵‍💫</div>
-                <h3 className="text-2xl font-black text-slate-800 mb-2">哎呀！出錯了</h3>
+                <h3 className="text-2xl font-black text-slate-800 mb-2">哎呀！</h3>
                 <p className="text-slate-600 mb-8 font-bold whitespace-pre-line leading-relaxed bg-slate-50 p-4 rounded-xl">
                     {errorMsg}
                 </p>
@@ -127,12 +139,21 @@ const App: React.FC = () => {
                     >
                         關閉
                     </button>
-                    <button 
-                        onClick={() => { setErrorMsg(null); handleRandomPlay(); }}
-                        className="px-6 py-3 rounded-xl bg-teal-500 text-white font-bold hover:bg-teal-600 transition-colors shadow-lg flex items-center gap-2"
-                    >
-                        <i className="fas fa-redo"></i> 再試一次
-                    </button>
+                    {isQuotaError ? (
+                        <button 
+                            onClick={switchToPresetMode}
+                            className="px-6 py-3 rounded-xl bg-teal-500 text-white font-bold hover:bg-teal-600 transition-colors shadow-lg flex items-center gap-2"
+                        >
+                            <i className="fas fa-play"></i> 玩內建景點
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={() => { setErrorMsg(null); handleRandomPlay(); }}
+                            className="px-6 py-3 rounded-xl bg-teal-500 text-white font-bold hover:bg-teal-600 transition-colors shadow-lg flex items-center gap-2"
+                        >
+                            <i className="fas fa-redo"></i> 再試一次
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

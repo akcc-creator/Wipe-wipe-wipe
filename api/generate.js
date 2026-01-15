@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from '@google/genai';
 
 export const config = {
@@ -20,30 +21,22 @@ export default async function handler(request, response) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    console.log("Server: Generating image...");
+    console.log("Server: Generating image with Imagen 3...");
 
-    const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: prompt + ". Photorealistic, 8k resolution, highly detailed, vivid colors, 16:9 aspect ratio, cinematic lighting." }],
-      },
+    // Switch to Imagen 3 (imagen-3.0-generate-001)
+    const result = await ai.models.generateImages({
+      model: 'imagen-3.0-generate-001',
+      prompt: prompt + ". Photorealistic, 8k resolution, highly detailed, vivid colors, 16:9 aspect ratio, cinematic lighting.",
       config: {
-        imageConfig: {
-          aspectRatio: "16:9",
-        }
+        numberOfImages: 1,
+        aspectRatio: '16:9',
+        outputMimeType: 'image/jpeg'
       },
     });
 
     let imageBase64 = null;
-    const parts = result.candidates?.[0]?.content?.parts;
-    
-    if (parts) {
-      for (const part of parts) {
-        if (part.inlineData) {
-          imageBase64 = `data:image/png;base64,${part.inlineData.data}`;
-          break;
-        }
-      }
+    if (result.generatedImages && result.generatedImages.length > 0) {
+        imageBase64 = `data:image/jpeg;base64,${result.generatedImages[0].image.imageBytes}`;
     }
 
     if (!imageBase64) {

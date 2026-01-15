@@ -22,23 +22,24 @@ const generateClientSide = async (prompt: string): Promise<string | null> => {
     console.log("✅ Client-Side: API_KEY found. Length:", process.env.API_KEY.length);
   }
   
-  console.log("Generating with Client-Side SDK...");
+  console.log("Generating with Client-Side SDK (Imagen 3)...");
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
-    contents: {
-      parts: [{ text: prompt + ". Photorealistic, 8k resolution, highly detailed, vivid colors, 16:9 aspect ratio, cinematic lighting." }],
-    },
+  
+  // Switch to Imagen 3 (imagen-3.0-generate-001) using generateImages API
+  // This helps bypass the quota limits often hit by gemini-2.5-flash-image
+  const response = await ai.models.generateImages({
+    model: 'imagen-3.0-generate-001',
+    prompt: prompt + ". Photorealistic, 8k resolution, highly detailed, vivid colors, 16:9 aspect ratio, cinematic lighting.",
     config: {
-      imageConfig: { aspectRatio: "16:9" }
-    },
+      numberOfImages: 1,
+      aspectRatio: '16:9',
+      outputMimeType: 'image/jpeg'
+    }
   });
 
-  const parts = response.candidates?.[0]?.content?.parts;
-  if (parts) {
-    for (const part of parts) {
-      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
-    }
+  const imageBytes = response.generatedImages?.[0]?.image?.imageBytes;
+  if (imageBytes) {
+    return `data:image/jpeg;base64,${imageBytes}`;
   }
   return null;
 };

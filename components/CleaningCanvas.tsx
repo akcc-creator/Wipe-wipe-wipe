@@ -19,7 +19,7 @@ const FOG_OPACITY = 0.98;
 
 const lerp = (start: number, end: number, factor: number) => start + (end - start) * factor;
 
-// Particle System for Foam/Bubbles
+// Particle System for Foam/Bubbles & Grime
 interface Particle {
   x: number;
   y: number;
@@ -27,7 +27,8 @@ interface Particle {
   vy: number;
   life: number;
   size: number;
-  type: 'foam' | 'sparkle';
+  type: 'foam' | 'sparkle' | 'grime'; // Added 'grime'
+  color?: string;
 }
 
 const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
@@ -145,31 +146,46 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
     }
   };
 
-  // --- 3. ENHANCED PARTICLE SYSTEM (FOAM & SPARKLES) ---
+  // --- 3. ENHANCED PARTICLE SYSTEM (FOAM, SPARKLES & GRIME) ---
   const spawnParticles = (x: number, y: number) => {
-    // 1. Foam (Bubbles) - Increased count for better feedback
-    for (let i = 0; i < 3; i++) {
+    // 1. Foam (Bubbles)
+    for (let i = 0; i < 2; i++) {
       particlesRef.current.push({
-        x: x + (Math.random() - 0.5) * brushSize * 0.8,
-        y: y + (Math.random() - 0.5) * brushSize * 0.8,
+        x: x + (Math.random() - 0.5) * brushSize * 0.6,
+        y: y + (Math.random() - 0.5) * brushSize * 0.6,
         vx: (Math.random() - 0.5) * 0.5,
         vy: (Math.random() - 0.5) * 0.5,
         life: 1.0,
-        size: Math.random() * 12 + 6,
+        size: Math.random() * 8 + 4,
         type: 'foam'
       });
     }
 
     // 2. Sparkles (Water droplets)
-    for (let i = 0; i < 2; i++) {
+    if (Math.random() > 0.5) {
         particlesRef.current.push({
           x: x,
           y: y,
-          vx: (Math.random() - 0.5) * 8,
-          vy: (Math.random() - 0.5) * 8,
+          vx: (Math.random() - 0.5) * 5,
+          vy: (Math.random() - 0.5) * 5,
           life: 1.0,
           size: Math.random() * 3 + 1,
           type: 'sparkle'
+        });
+    }
+
+    // 3. Grime (Falling Dust/Dirt) - VISUAL ENHANCEMENT
+    // Spawns "dirt" that falls down, simulating physical cleaning
+    for (let i = 0; i < 3; i++) {
+        particlesRef.current.push({
+            x: x + (Math.random() - 0.5) * brushSize,
+            y: y + (Math.random() - 0.5) * brushSize,
+            vx: (Math.random() - 0.5) * 2, // Slight horizontal scatter
+            vy: Math.random() * 3 + 2,     // Gravity: Falls down
+            life: 1.0,
+            size: Math.random() * 4 + 2,
+            type: 'grime',
+            color: Math.random() > 0.5 ? '#8B4513' : '#654321' // Brown/Dark dirt colors
         });
     }
   };
@@ -183,29 +199,29 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
       if (p.type === 'foam') {
         p.life -= 0.02; 
         p.size *= 0.98;
-      } else {
+      } else if (p.type === 'sparkle') {
         p.life -= 0.05; 
+      } else if (p.type === 'grime') {
+        p.life -= 0.015; // Grime lasts longer as it falls
+        p.vy += 0.1;     // Accelerate (Gravity)
       }
 
-      if (p.life <= 0) {
+      if (p.life <= 0 || p.y > ctx.canvas.height) {
         particlesRef.current.splice(i, 1);
       } else {
         ctx.beginPath();
         if (p.type === 'foam') {
-             // White, bubbly foam
-            ctx.fillStyle = `rgba(255, 255, 255, ${p.life * 0.7})`;
+            ctx.fillStyle = `rgba(255, 255, 255, ${p.life * 0.6})`;
             ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
             ctx.fill();
-            // Highlight
-            ctx.fillStyle = `rgba(255, 255, 255, ${p.life})`;
-            ctx.beginPath();
-            ctx.arc(p.x - p.size*0.3, p.y - p.size*0.3, p.size*0.3, 0, Math.PI * 2);
-            ctx.fill();
-        } else {
-            // Shiny sparkles
+        } else if (p.type === 'sparkle') {
             ctx.fillStyle = `rgba(200, 250, 255, ${p.life})`;
             ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
             ctx.fill();
+        } else if (p.type === 'grime') {
+            // Draw grime as small jagged squares or circles
+            ctx.fillStyle = `rgba(100, 100, 100, ${p.life * 0.8})`; // Dark gray/brown
+            ctx.fillRect(p.x, p.y, p.size, p.size);
         }
       }
     }
@@ -236,10 +252,9 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
         const y = current.y;
 
         // Visual Enhancement: HAND CURSOR
-        
-        // 1. Cleaning Area Glow (Keep brushSize)
+        // 1. Cleaning Area Glow
         const grad = ctx.createRadialGradient(x, y, 0, x, y, brushSize / 1.5);
-        grad.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+        grad.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
         grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
         ctx.fillStyle = grad;
         ctx.beginPath();
@@ -247,13 +262,10 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
         ctx.fill();
 
         // 2. Hand Emoji
-        // Adjusted to 0.5 for better visibility (60% larger than previous fail)
         const handSize = brushSize * 0.5; 
-        
         ctx.font = `${handSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        
         ctx.shadowColor = 'rgba(0,0,0,0.3)';
         ctx.shadowBlur = 10;
         ctx.fillText('🖐️', x, y);
@@ -286,19 +298,19 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
       stainContextRef.current = ctx;
       ctx.globalCompositeOperation = 'source-over';
       
-      // Base Fog
-      ctx.fillStyle = `rgba(240, 245, 250, ${FOG_OPACITY})`; 
+      // Base Fog - slightly darker to make cleaning more satisfying
+      ctx.fillStyle = `rgba(230, 235, 240, ${FOG_OPACITY})`; 
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Texture
-      for(let i = 0; i < 400; i++) {
+      // Texture - Grime spots
+      for(let i = 0; i < 600; i++) {
         const x = Math.random() * canvas.width;
         const y = Math.random() * canvas.height;
-        const r = Math.random() * 100 + 20;
+        const r = Math.random() * 80 + 10;
         ctx.beginPath();
         const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-        grad.addColorStop(0, 'rgba(200, 210, 220, 0.4)');
-        grad.addColorStop(1, 'rgba(200, 210, 220, 0)');
+        grad.addColorStop(0, 'rgba(180, 190, 200, 0.3)'); // Darker spots
+        grad.addColorStop(1, 'rgba(180, 190, 200, 0)');
         ctx.fillStyle = grad;
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
@@ -351,16 +363,15 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
 
     ctx.globalCompositeOperation = 'destination-out';
     
-    // Increased hardness: Removing the factor makes it wipe cleaner, faster.
-    // e.g. wipesRequired=4 => opacity ~0.25 per frame (stronger than 0.16)
+    // Hardness calculation
     const hardness = 1 / Math.max(1, wipesRequired); 
     
     ctx.strokeStyle = `rgba(0, 0, 0, ${hardness})`; 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.lineWidth = brushSize;
-    ctx.shadowBlur = brushSize / 2;
-    ctx.shadowColor = 'rgba(0,0,0,1)';
+    ctx.shadowBlur = brushSize / 4; // Reduced blur for crisper "wipe" edges
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
 
     ctx.beginPath();
     if (lastDrawPosRef.current) {
