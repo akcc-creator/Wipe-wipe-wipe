@@ -1,29 +1,23 @@
 
-import { GoogleGenAI } from "@google/genai";
+// This service now calls our internal /api/generate endpoint.
+// This ensures the API Key is hidden and solves CORS/Region issues (works in HK).
 
-// Now using Gemini 2.5 Flash Image (Nano Banana) for speed in all dynamic generations
 export const generateThemeBackground = async (prompt: string): Promise<string | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
-  
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', 
-      contents: {
-        parts: [{ text: prompt + ". High quality, vivid colors, 16:9 aspect ratio." }],
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      config: {
-        imageConfig: {
-          aspectRatio: "16:9",
-        }
-      },
+      body: JSON.stringify({ prompt }),
     });
 
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
     }
-    return null;
+
+    const data = await response.json();
+    return data.image || null;
   } catch (error) {
     console.error("Image generation failed:", error);
     return null;
@@ -31,9 +25,7 @@ export const generateThemeBackground = async (prompt: string): Promise<string | 
 };
 
 export const generateRandomBackground = async (): Promise<string | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
-  
-  // Expanded themes beyond just landscapes for maximum surprise
+  // Expanded themes for maximum surprise
   const themes = [
     "A cute fluffy cat wearing sunglasses on a beach",
     "A futuristic cyberpunk city with neon lights and flying cars",
@@ -48,29 +40,9 @@ export const generateRandomBackground = async (): Promise<string | null> => {
     "A retro 80s synthwave sunset landscape",
     "A peaceful japanese zen garden with cherry blossoms"
   ];
+  
   const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+  const fullPrompt = `Create a high quality image of: ${randomTheme}. 16:9 aspect ratio, photorealistic OR artistic style.`;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: `Create a high quality image of: ${randomTheme}. 16:9 aspect ratio, photorealistic OR artistic style.` }],
-      },
-       config: {
-        imageConfig: {
-          aspectRatio: "16:9",
-        }
-      },
-    });
-
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    return null;
-  } catch (error) {
-    console.error("Random generation failed:", error);
-    return null;
-  }
+  return generateThemeBackground(fullPrompt);
 };
