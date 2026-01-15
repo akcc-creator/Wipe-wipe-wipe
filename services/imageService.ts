@@ -1,6 +1,5 @@
 
 import { GoogleGenAI } from '@google/genai';
-import { BACKGROUNDS } from '../constants';
 
 // === GENERATION STRATEGY ===
 // 1. If API_KEY is present in client bundle -> Use Client-Side SDK (Fastest, works on static hosts/local).
@@ -15,10 +14,12 @@ export interface GenerationResult {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const generateClientSide = async (prompt: string): Promise<string | null> => {
-  // Debug check
+  // Debug Logging
   if (!process.env.API_KEY) {
-    console.warn("Client-Side Generation Skipped: API_KEY not found in process.env");
+    console.warn("❌ Client-Side: API_KEY is missing in process.env");
     return null;
+  } else {
+    console.log("✅ Client-Side: API_KEY found. Length:", process.env.API_KEY.length);
   }
   
   console.log("Generating with Client-Side SDK...");
@@ -81,7 +82,7 @@ const attemptGeneration = async (
       console.warn(`Attempt ${i + 1} failed:`, error.message);
       
       // Stop retrying if it's a configuration error (missing key/endpoint)
-      if (error.message.includes("not found") || error.message.includes("API_KEY")) {
+      if (error.message.includes("not found") || error.message.includes("API_KEY") || error.message.includes("Missing")) {
         throw error;
       }
       

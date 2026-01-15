@@ -7,17 +7,18 @@ export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   const env = loadEnv(mode, process.cwd(), '');
   
-  // === Vercel / Vite Configuration Strategy ===
-  // 1. On Vercel, use 'VITE_API_KEY' (Visible in screenshot).
-  // 2. Locally, 'API_KEY' might be used in .env.
-  // We prioritize VITE_API_KEY to ensure the client bundle gets the key.
-  const apiKey = env.VITE_API_KEY || env.API_KEY;
+  // === CRITICAL FIX FOR VERCEL ===
+  // Vercel injects variables into `process.env` during build.
+  // `loadEnv` sometimes only looks at local .env files.
+  // We must check BOTH `process.env` (Server/Vercel) and `env` (Local .env).
+  const apiKey = process.env.VITE_API_KEY || process.env.API_KEY || env.VITE_API_KEY || env.API_KEY;
+
+  console.log("Build detected API Key:", apiKey ? "Yes (Hidden)" : "No (Missing)");
 
   return {
     plugins: [react()],
     define: {
-      // Polyfill process.env.API_KEY so the Google GenAI SDK can use it in the browser
-      // This injects the actual key string into the built javascript files.
+      // Inject the key into the browser code
       'process.env.API_KEY': JSON.stringify(apiKey)
     }
   }
