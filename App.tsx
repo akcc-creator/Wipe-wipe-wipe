@@ -73,8 +73,11 @@ const App: React.FC = () => {
     <div className="relative w-screen h-screen flex flex-col bg-[#f8fafc]">
       <header className="absolute top-0 left-0 right-0 z-20 p-6 flex justify-between items-start pointer-events-none">
         <div className="bg-white/95 backdrop-blur-md px-10 py-4 rounded-full shadow-2xl pointer-events-auto border border-teal-100 flex items-center gap-4">
-          <span className="text-3xl">🧽</span>
-          <h1 className="text-3xl font-black text-teal-800 tracking-tight">ZenClean</h1>
+          <span className="text-3xl">✨</span>
+          <div>
+            <h1 className="text-3xl font-black text-teal-800 tracking-tight">神手去旅行</h1>
+            <p className="text-xs text-teal-600 font-bold tracking-widest uppercase">ZenClean AI 復健</p>
+          </div>
         </div>
 
         <div className="flex flex-col items-end gap-4 pointer-events-auto">
@@ -111,10 +114,10 @@ const App: React.FC = () => {
           <div className="absolute inset-0 overflow-y-auto bg-gradient-to-br from-blue-50 via-white to-teal-50 p-12">
             <div className="max-w-7xl mx-auto text-center space-y-16 py-16">
               <div className="space-y-6">
-                <h2 className="text-6xl font-black text-slate-800 tracking-tighter">選擇一個神秘地點</h2>
+                <h2 className="text-6xl font-black text-slate-800 tracking-tighter">準備好去哪裡旅行了嗎？</h2>
                 <p className="text-3xl text-slate-500 font-medium max-w-3xl mx-auto leading-relaxed">
-                  窗戶上的霧氣很重，你看得清背後的風景嗎？<br/>
-                  舉起手，朝同一個地方抹抹看！
+                  窗外有好美的風景，但被霧擋住了。<br/>
+                  請用你的「神之手」，把窗戶擦乾淨吧！
                 </p>
                 
                 {/* Random Generation Button */}
@@ -126,14 +129,14 @@ const App: React.FC = () => {
                     {isGenerating ? (
                         <>
                             <i className="fas fa-spinner animate-spin text-3xl"></i>
-                            <span className="text-2xl font-black">生成神秘風景中...</span>
+                            <span className="text-2xl font-black">生成神秘景點中...</span>
                         </>
                     ) : (
                         <>
-                            <span className="text-4xl animate-bounce">🎲</span>
+                            <span className="text-4xl animate-bounce">🌍</span>
                             <div className="text-left">
-                                <div className="text-2xl font-black">隨機神秘體驗</div>
-                                <div className="text-sm font-medium opacity-90">任何驚喜主題！動物、城市、美食...</div>
+                                <div className="text-2xl font-black">隨機去旅行</div>
+                                <div className="text-sm font-medium opacity-90">任何驚喜地點！城市、美食、大自然...</div>
                             </div>
                         </>
                     )}
@@ -178,7 +181,7 @@ const App: React.FC = () => {
             disabled={isGenerating}
             className="bg-white/95 backdrop-blur-md px-12 py-5 rounded-full shadow-2xl hover:bg-white text-slate-800 font-black text-2xl transition-all border-b-4 border-slate-300 active:border-0 active:translate-y-1 flex items-center gap-4 disabled:opacity-50"
           >
-            <i className="fas fa-th-large text-teal-500"></i> 返回選單
+            <i className="fas fa-home text-teal-500"></i> 回首頁
           </button>
           
           {gameState === GameState.COMPLETED && (
@@ -189,12 +192,12 @@ const App: React.FC = () => {
             >
               {isGenerating ? (
                   <>
-                    <i className="fas fa-spinner animate-spin"></i> 生成中...
+                    <i className="fas fa-spinner animate-spin"></i> 規劃行程中...
                   </>
               ) : (
                   <>
-                    {currentBg.id === 'random' ? '再來一張神秘圖' : `生成下一張「${currentBg.label}」`} 
-                    <i className={`fas ${currentBg.id === 'random' ? 'fa-dice' : 'fa-wand-magic-sparkles'}`}></i>
+                    {currentBg.id === 'random' ? '去下一個地方' : `再看一張「${currentBg.label}」`} 
+                    <i className={`fas ${currentBg.id === 'random' ? 'fa-plane' : 'fa-camera'}`}></i>
                   </>
               )}
             </button>
