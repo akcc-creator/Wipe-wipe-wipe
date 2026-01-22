@@ -1,6 +1,6 @@
 {
-  "name": "ZenClean - Elder Rehabilitation Hand Tracking Game",
-  "description": "A therapeutic window-cleaning game for seniors using camera-based hand tracking to reveal beautiful AI-generated landscapes.",
+  "name": "Wipe to Travel - Elder Rehabilitation Hand Tracking Game",
+  "description": "A therapeutic window-cleaning game for seniors using camera-based hand tracking to reveal beautiful landscapes.",
   "requestFramePermissions": [
     "camera"
   ]

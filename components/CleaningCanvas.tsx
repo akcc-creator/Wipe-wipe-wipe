@@ -17,6 +17,8 @@ const TRACKING_SMOOTHING = 0.5;
 const MOVEMENT_SENSITIVITY = 1.8; 
 const FOG_OPACITY = 0.95; 
 const LOST_TRACKING_GRACE_PERIOD = 2000;
+// Fallback image in case the intended image fails to load
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1080&q=80';
 
 const lerp = (start: number, end: number, factor: number) => start + (end - start) * factor;
 
@@ -56,7 +58,12 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
   const [isTrackingActive, setIsTrackingActive] = useState(false);
   const [inputType, setInputType] = useState<'camera' | 'mouse'>('camera');
   const [showGuide, setShowGuide] = useState(false);
-  const [isImageLoaded, setIsImageLoaded] = useState(false); // Image loading state
+  
+  // Image & Layer State
+  const [isImageLoaded, setIsImageLoaded] = useState(false); 
+  // NEW: Ensures we don't show the BG until the fog layer is painted
+  const [isCanvasReady, setIsCanvasReady] = useState(false); 
+  const [activeImageUrl, setActiveImageUrl] = useState<string>(backgroundImage);
   
   // Refs for tracking
   const lastHandDetectionTime = useRef<number>(0);
@@ -72,20 +79,31 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
   
   const lastProgressCheckTime = useRef<number>(0);
 
-  // --- 0. PRELOAD IMAGE ---
-  // Fix for blank screen issue: Wait for image to load before initializing canvas layers
+  // --- 0. ROBUST IMAGE LOADING ---
   useEffect(() => {
     setIsImageLoaded(false);
+    setIsCanvasReady(false); // Reset canvas ready state on new image
+    setActiveImageUrl(backgroundImage);
+
     const img = new Image();
     img.src = backgroundImage;
+    
     img.onload = () => {
+      setActiveImageUrl(backgroundImage);
       setIsImageLoaded(true);
     };
+    
     img.onerror = () => {
-      console.error("Failed to load background image:", backgroundImage);
-      // Even if failed, we set loaded to true to show *something* (white bg) rather than infinite spinner,
-      // though ideally App.tsx handles fetch errors.
-      setIsImageLoaded(true);
+      console.warn(`Failed to load: ${backgroundImage}. Switching to fallback.`);
+      const fallbackImg = new Image();
+      fallbackImg.src = FALLBACK_IMAGE;
+      fallbackImg.onload = () => {
+          setActiveImageUrl(FALLBACK_IMAGE);
+          setIsImageLoaded(true);
+      };
+      fallbackImg.onerror = () => {
+          setIsImageLoaded(true); 
+      }
     };
   }, [backgroundImage]);
 
@@ -313,11 +331,12 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
     if (ctx) {
       ctx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
       
-      if (!isComplete && isImageLoaded) {
+      // Only draw particles if image is loaded and canvas is ready (fog painted)
+      if (!isComplete && isImageLoaded && isCanvasReady) {
         updateAndDrawParticles(ctx);
       }
 
-      const isInteracting = (isTrackingActive || inputType === 'mouse') && !isComplete && isCameraReady && isImageLoaded;
+      const isInteracting = (isTrackingActive || inputType === 'mouse') && !isComplete && isCameraReady && isImageLoaded && isCanvasReady;
 
       if (isInteracting) {
         const x = current.x;
@@ -358,7 +377,7 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
     }
 
     requestRef.current = requestAnimationFrame(animate);
-  }, [isTrackingActive, inputType, isComplete, brushSize, isCameraReady, isImageLoaded]);
+  }, [isTrackingActive, inputType, isComplete, brushSize, isCameraReady, isImageLoaded, isCanvasReady]);
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);
@@ -367,7 +386,7 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
 
   // --- 5. STAIN LAYER (NOISE & FOG) ---
   useEffect(() => {
-    // Only initialize stain layer AFTER image is loaded to prevent issues
+    // Only initialize stain layer AFTER image is loaded
     if (!isImageLoaded) return;
 
     const canvas = stainCanvasRef.current;
@@ -380,6 +399,10 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
       stainContextRef.current = ctx;
       ctx.globalCompositeOperation = 'source-over';
       
+      // Clear previous
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Fill Fog
       ctx.fillStyle = `rgba(235, 240, 245, ${FOG_OPACITY})`; 
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -396,6 +419,7 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
       }
       ctx.putImageData(imageData, 0, 0);
 
+      // Water drops
       for(let i = 0; i < 400; i++) {
         const x = Math.random() * canvas.width;
         const y = Math.random() * canvas.height;
@@ -405,6 +429,9 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      // CRITICAL: Only after painting the fog do we reveal the container
+      setIsCanvasReady(true);
     };
 
     const parent = canvas.parentElement;
@@ -423,7 +450,7 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
     observer.observe(parent);
 
     return () => observer.disconnect();
-  }, [backgroundImage, isImageLoaded]); // Dependency added: isImageLoaded
+  }, [activeImageUrl, isImageLoaded]); 
 
   const calculateProgress = useCallback(() => {
     const ctx = stainContextRef.current;
@@ -497,14 +524,27 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
     }
   };
 
+  // Determine if we should show the content
+  // Content is visible ONLY when image is loaded AND fog is painted
+  const isContentVisible = isImageLoaded && isCanvasReady;
+
   return (
     <div 
-      className={`relative w-full h-full overflow-hidden select-none bg-cover bg-center ${!isComplete ? 'cursor-none' : ''}`}
-      style={{ backgroundImage: `url(${backgroundImage})` }}
+      className="relative w-full h-full overflow-hidden select-none bg-gray-50"
       onPointerMove={handlePointerMove}
     >
-      <canvas ref={stainCanvasRef} className="absolute top-0 left-0 w-full h-full z-10" />
-      <canvas ref={cursorCanvasRef} className="absolute top-0 left-0 w-full h-full z-20 pointer-events-none" />
+      {/* 
+         WRAPPER for Image + Canvas
+         Controlled by opacity. Opacity 0 until fog is fully painted.
+         This prevents the "flash" of the underlying image.
+      */}
+      <div 
+        className={`absolute inset-0 transition-opacity duration-700 ease-in bg-cover bg-center ${isContentVisible ? 'opacity-100' : 'opacity-0'} ${!isComplete ? 'cursor-none' : ''}`}
+        style={{ backgroundImage: `url(${activeImageUrl})` }} 
+      >
+        <canvas ref={stainCanvasRef} className="absolute top-0 left-0 w-full h-full z-10" />
+        <canvas ref={cursorCanvasRef} className="absolute top-0 left-0 w-full h-full z-20 pointer-events-none" />
+      </div>
 
       {/* Completion Flash */}
       {isComplete && (
@@ -519,16 +559,17 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
         </div>
       )}
 
-      {/* --- IMAGE LOADING SPINNER --- */}
-      {!isImageLoaded && (
+      {/* --- LOADING SPINNER --- */}
+      {/* Shown when content is NOT visible yet (downloading or painting fog) */}
+      {!isContentVisible && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-[60]">
              <div className="w-16 h-16 border-8 border-slate-200 border-t-teal-500 rounded-full animate-spin mb-4"></div>
              <p className="text-xl font-bold text-slate-500 animate-pulse">風景下載中...</p>
           </div>
       )}
 
-      {/* Camera Loading */}
-      {isImageLoaded && !isCameraReady && !isComplete && (
+      {/* Camera Loading (Shown on top of foggy layer) */}
+      {isContentVisible && !isCameraReady && !isComplete && (
          <div className="absolute inset-0 flex items-center justify-center bg-slate-900/60 z-50 backdrop-blur-sm">
             <div className="bg-white p-8 rounded-3xl flex flex-col items-center gap-4 shadow-2xl animate-bounce-small">
                  <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
@@ -539,7 +580,7 @@ const CleaningCanvas: React.FC<CleaningCanvasProps> = ({
       )}
 
       {/* Ghost Hand Guide */}
-      {isImageLoaded && isCameraReady && !isTrackingActive && inputType === 'camera' && !isComplete && showGuide && (
+      {isContentVisible && isCameraReady && !isTrackingActive && inputType === 'camera' && !isComplete && showGuide && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 animate-fade-in">
           <div className="flex flex-col items-center">
              <div className="relative w-32 h-32 mb-6 opacity-80 animate-[wave_2s_infinite_ease-in-out]">
